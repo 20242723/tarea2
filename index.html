@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Segmentación de Clientes RFM & K-Means</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f5ff',
+                            100: '#e0ebff',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        },
+                        vip: '#8b5cf6',
+                        recent: '#06b6d4',
+                        frequent: '#10b981',
+                        atrisk: '#f59e0b'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- SheetJS (xlsx) CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-active {
+            border-bottom: 3px solid #2563eb;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .drag-active {
+            border-color: #2563eb !important;
+            background-color: #eff6ff !important;
+        }
+        /* Custom scrollbar for data tables */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="min-h-full flex flex-col text-slate-800 bg-slate-50">
+
+    <!-- Top Header Navigation -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Brand Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                        <i class="fa-solid font-bold text-lg fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight tracking-wide">RFM Analytics Hub</h1>
+                        <p class="text-xs text-slate-400">Segmentación Estratégica de Clientes & K-Means</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="flex space-x-1 sm:space-x-4">
+                    <button onclick="switchTab('tab-notebook')" id="btn-tab-notebook" class="px-3 py-2 text-sm font-medium text-slate-300 hover:text-white rounded-lg transition-colors flex items-center space-x-2 bg-slate-800">
+                        <i class="fa-solid fa-book-open"></i>
+                        <span class="hidden md:inline">Resumen Ejecutivo & Notebook</span>
+                    </button>
+                    <button onclick="switchTab('tab-analyzer')" id="btn-tab-analyzer" class="px-3 py-2 text-sm font-medium text-slate-300 hover:text-white rounded-lg transition-colors flex items-center space-x-2">
+                        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+                        <span>Analizador Dinámico (Excel/CSV)</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notification Toast Element -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <!-- Main Content Wrapper -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- =================================================================== -->
+        <!-- TAB 1: RESUMEN EJECUTIVO Y NOTEBOOK MODELO -->
+        <!-- =================================================================== -->
+        <div id="tab-notebook" class="space-y-8">
+            <!-- Intro Banner -->
+            <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 opacity-10">
+                    <i class="fa-solid fa-users-gear text-[220px]"></i>
+                </div>
+                <div class="relative z-10 max-w-3xl">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30 mb-3">
+                        <i class="fa-solid fa-brain mr-1.5"></i> Machine Learning Aplicado
+                    </span>
+                    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Análisis del Cuaderno Colab: <span class="text-blue-400">customer-segmentation-with-rfm.ipynb</span></h2>
+                    <p class="mt-2 text-slate-300 text-sm sm:text-base leading-relaxed">
+                        Evaluación integral del comportamiento de compra mediante la matriz RFM (Recency, Frequency, Monetary) y agrupamiento con el algoritmo K-Means para maximizar la retención y el valor de vida del cliente (CLV).
+                    </p>
+                </div>
+            </div>
+
+            <!-- Global Executive KPIs -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Clientes Analizados</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-1">4,372</h3>
+                        <span class="text-xs text-emerald-600 font-medium inline-flex items-center mt-1">
+                            <i class="fa-solid fa-check-circle mr-1"></i> Filtrados post-limpieza
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Ingresos Totales (Dataset)</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-1">$8,911,429</h3>
+                        <span class="text-xs text-slate-500 font-medium inline-flex items-center mt-1">
+                            Moneda estándar USD
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-sack-dollar"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Recencia Promedio</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-1">91.5 Días</h3>
+                        <span class="text-xs text-amber-600 font-medium inline-flex items-center mt-1">
+                            <i class="fa-solid fa-clock-rotate-left mr-1"></i> Desde última compra
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-calendar-day"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Óptimo K (Clusters)</p>
+                        <h3 class="text-2xl font-bold text-slate-900 mt-1">K = 4</h3>
+                        <span class="text-xs text-indigo-600 font-medium inline-flex items-center mt-1">
+                            <i class="fa-solid fa-chart-line mr-1"></i> Método del Codo
+                        </span>
+                    </div>
+                    <div class="w-12 h-12 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-diagram-project"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preprocessing & Methodology Summary -->
+            <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                <h3 class="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                    <i class="fa-solid fa-list-check text-blue-600 mr-2"></i> Flujo de Trabajo y Metodología del Modelo
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center mb-3">1</div>
+                        <h4 class="font-semibold text-slate-800 text-sm mb-1">Preprocesamiento y Limpieza</h4>
+                        <p class="text-xs text-slate-600 leading-relaxed">
+                            Eliminación de registros con <code class="bg-slate-200 px-1 py-0.5 rounded text-slate-800">CustomerID</code> nulo, cancelación de transacciones negativas (devoluciones), y depuración de registros duplicados.
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                        <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center mb-3">2</div>
+                        <h4 class="font-semibold text-slate-800 text-sm mb-1">Cálculo de Variables RFM</h4>
+                        <p class="text-xs text-slate-600 leading-relaxed">
+                            <strong>Recency (R):</strong> Días transcurridos. <strong>Frequency (F):</strong> Total de órdenes realizadas. <strong>Monetary (M):</strong> Suma acumulada de compras en el periodo analizado.
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-lg bg-slate-50 border border-slate-100">
+                        <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center mb-3">3</div>
+                        <h4 class="font-semibold text-slate-800 text-sm mb-1">Estandarización y K-Means</h4>
+                        <p class="text-xs text-slate-600 leading-relaxed">
+                            Transformación Z-score para neutralizar la escala de valores y aplicación del algoritmo K-Means con determinación de punto de inflexión WCSS.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notebook Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Elbow Method Chart -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h4 class="font-bold text-slate-900">Método del Codo (Elbow Method)</h4>
+                            <p class="text-xs text-slate-500">Inercia intra-cluster (WCSS) según número de Clusters (K)</p>
+                        </div>
+                        <span class="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md">K óptimo = 4</span>
+                    </div>
+                    <div class="h-64 relative">
+                        <canvas id="chart-elbow"></canvas>
+                    </div>
+                </div>
+
+                <!-- Segment Distribution Chart -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h4 class="font-bold text-slate-900">Distribución de Segmentos</h4>
+                            <p class="text-xs text-slate-500">Proporción de clientes agrupados por comportamiento</p>
+                        </div>
+                    </div>
+                    <div class="h-64 relative flex items-center justify-center">
+                        <canvas id="chart-segments"></canvas>
+                    </div>
+                </div>
+
+                <!-- RFM Average Metrics per Segment Chart -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h4 class="font-bold text-slate-900">Perfil Promedio por Segmento</h4>
+                            <p class="text-xs text-slate-500">Comparación de Recencia (días), Frecuencia (pedidos) y Monto ($) escalados</p>
+                        </div>
+                    </div>
+                    <div class="h-72 relative">
+                        <canvas id="chart-rfm-comparison"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Strategic Recommendations Section -->
+            <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-6">
+                <div class="border-b border-slate-100 pb-4">
+                    <h3 class="text-xl font-bold text-slate-900 flex items-center">
+                        <i class="fa-solid fa-bullseye text-blue-600 mr-2.5"></i> Estrategias de Marketing Recomendadas por Segmento
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1">Planes de acción específicos basados en las características analíticas de cada grupo.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Segment 1: Big Spenders / VIP -->
+                    <div class="p-5 rounded-xl border-l-4 border-l-purple-600 bg-purple-50/40 border border-slate-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-sm">
+                                    <i class="fa-solid fa-crown"></i>
+                                </div>
+                                <h4 class="font-bold text-slate-900">Big Spenders / VIP</h4>
+                            </div>
+                            <span class="text-xs px-2.5 py-1 rounded-full font-semibold bg-purple-100 text-purple-800">12.5% Clientes | 58% Ingresos</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-3">High Monetary, High Frequency, Low Recency. Clientes clave que generan la mayor rentabilidad.</p>
+                        <ul class="text-xs text-slate-700 space-y-2 list-disc list-inside font-medium">
+                            <li>Programa de fidelización exclusivo con beneficios VIP y ejecutivo dedicado.</li>
+                            <li>Acceso prioritario a lanzamientos y productos de edición limitada.</li>
+                            <li>Estrategia de cross-selling de productos premium sin ofrecer descuentos agresivos.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Segment 2: Recent / Promising -->
+                    <div class="p-5 rounded-xl border-l-4 border-l-cyan-500 bg-cyan-50/40 border border-slate-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-8 h-8 rounded-lg bg-cyan-500 text-white flex items-center justify-center font-bold text-sm">
+                                    <i class="fa-solid fa-rocket"></i>
+                                </div>
+                                <h4 class="font-bold text-slate-900">Nuevos Prometedores</h4>
+                            </div>
+                            <span class="text-xs px-2.5 py-1 rounded-full font-semibold bg-cyan-100 text-cyan-800">28.0% Clientes</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-3">Low Recency, Low/Moderate Frequency, Moderate Monetary. Clientes recientemente incorporados.</p>
+                        <ul class="text-xs text-slate-700 space-y-2 list-disc list-inside font-medium">
+                            <li>Secuencia de email marketing de bienvenida y educación de producto (Onboarding).</li>
+                            <li>Incentivo para la 2da y 3ra compra con cupones de descuento por tiempo limitado.</li>
+                            <li>Solicitud de reseñas y retroalimentación para afianzar la confianza.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Segment 3: Frequent Low Spenders -->
+                    <div class="p-5 rounded-xl border-l-4 border-l-emerald-500 bg-emerald-50/40 border border-slate-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-sm">
+                                    <i class="fa-solid fa-arrows-rotate"></i>
+                                </div>
+                                <h4 class="font-bold text-slate-900">Frecuentes Regulares</h4>
+                            </div>
+                            <span class="text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-100 text-emerald-800">34.2% Clientes</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-3">High Frequency, Low Recency, Moderate/Low Monetary. Compran seguido pero con ticket medio bajo.</p>
+                        <ul class="text-xs text-slate-700 space-y-2 list-disc list-inside font-medium">
+                            <li>Estrategia de Upselling mediante venta en paquetes (Bundles) y umbrales de envío gratis.</li>
+                            <li>Programas de puntos acumulables por volumen de compra.</li>
+                            <li>Recomendaciones personalizadas basadas en su historial frecuente.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Segment 4: At Risk / Churn -->
+                    <div class="p-5 rounded-xl border-l-4 border-l-amber-500 bg-amber-50/40 border border-slate-200">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-sm">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                </div>
+                                <h4 class="font-bold text-slate-900">En Riesgo / Inactivos</h4>
+                            </div>
+                            <span class="text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-800">25.3% Clientes</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mb-3">High Recency (mucho tiempo sin comprar), Low Frequency, Variable Monetary. Alto riesgo de fuga.</p>
+                        <ul class="text-xs text-slate-700 space-y-2 list-disc list-inside font-medium">
+                            <li>Campañas agresivas de reactivación ("Te echamos de menos" + Descuento exclusivo).</li>
+                            <li>Encuestas breves para identificar motivos de abandono o insatisfacción.</li>
+                            <li>Demostración de nuevas características o catálogo renovado.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- =================================================================== -->
+        <!-- TAB 2: ANALIZADOR DINÁMICO DE ARCHIVOS EXCEL Y CSV -->
+        <!-- =================================================================== -->
+        <div id="tab-analyzer" class="hidden space-y-8">
+            
+            <!-- Upload & Settings Section -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4 mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900 flex items-center">
+                            <i class="fa-solid fa-file-excel text-emerald-600 mr-2.5"></i> Motor de Segmentación RFM en Vivo
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-1">Carga cualquier archivo Excel (.xlsx, .xls) o CSV con transacciones para calcular RFM y agrupamiento K-Means instantáneo.</p>
+                    </div>
+
+                    <!-- Sample Data Quick Load Button -->
+                    <button onclick="loadSampleDataset()" class="inline-flex items-center px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium text-xs hover:from-blue-700 hover:to-indigo-700 transition shadow-sm hover:shadow">
+                        <i class="fa-solid fa-bolt mr-2 text-amber-300"></i> Cargar Datos de Ejemplo (Dataset Demo)
+                    </button>
+                </div>
+
+                <!-- Drag & Drop Zone -->
+                <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center bg-slate-50 hover:bg-blue-50/50 transition-colors cursor-pointer relative">
+                    <input type="file" id="file-input" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileSelect(event)">
+                    <div class="flex flex-col items-center justify-center space-y-3">
+                        <div class="w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-2xl shadow-inner">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-800">Arrastra y suelta tu archivo Excel o CSV aquí</p>
+                            <p class="text-xs text-slate-500 mt-1">Soporta formatos .XLSX, .XLS o .CSV (hasta 50,000 filas recomendadas)</p>
+                        </div>
+                        <button onclick="document.getElementById('file-input').click()" type="button" class="mt-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 shadow-sm">
+                            Explorar Archivos Localmente
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Column Mapping Controls (Hidden until file loaded) -->
+                <div id="mapping-container" class="hidden mt-6 p-5 bg-blue-50/60 rounded-xl border border-blue-200 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-bold text-slate-900 text-sm flex items-center">
+                            <i class="fa-solid fa-sliders text-blue-600 mr-2"></i> Mapeo de Columnas Requeridas
+                        </h4>
+                        <span id="file-status-badge" class="text-xs font-semibold text-blue-800 bg-blue-100 px-3 py-1 rounded-full">
+                            Archivo cargado
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-600">Selecciona qué columnas de tu archivo corresponden a cada variable para procesar el algoritmo:</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">ID Cliente / Customer ID <span class="text-red-500">*</span></label>
+                            <select id="map-customer" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">Fecha Transacción / Invoice Date <span class="text-red-500">*</span></label>
+                            <select id="map-date" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">Monto Total / Amount <span class="text-red-500">*</span></label>
+                            <select id="map-amount" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex justify-end">
+                        <button onclick="runRFMAnalysis()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow hover:shadow-md transition flex items-center space-x-2">
+                            <i class="fa-solid fa-play"></i>
+                            <span>Procesar Segmentación RFM & K-Means</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Results Dashboard (Hidden until analysis executed) -->
+            <div id="analysis-results-section" class="hidden space-y-8">
+                
+                <!-- Dynamic KPIs -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Total Clientes Unicos</p>
+                        <h3 id="dyn-kpi-customers" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                        <span class="text-xs text-blue-600 font-medium">Agrupados por ID</span>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Monto Total Procesado</p>
+                        <h3 id="dyn-kpi-monetary" class="text-2xl font-bold text-slate-900 mt-1">$0</h3>
+                        <span class="text-xs text-emerald-600 font-medium">Suma de transacciones</span>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Recencia Promedio</p>
+                        <h3 id="dyn-kpi-recency" class="text-2xl font-bold text-slate-900 mt-1">0 días</h3>
+                        <span class="text-xs text-slate-500 font-medium">Antigüedad media</span>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Frecuencia Promedio</p>
+                        <h3 id="dyn-kpi-frequency" class="text-2xl font-bold text-slate-900 mt-1">0 órd.</h3>
+                        <span class="text-xs text-purple-600 font-medium">Compras por cliente</span>
+                    </div>
+                </div>
+
+                <!-- Dynamic Charts Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Dynamic Pie Chart -->
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-1">
+                        <h4 class="font-bold text-slate-900 mb-1">Segmentos del Archivo</h4>
+                        <p class="text-xs text-slate-500 mb-4">Proporción K-Means de tus datos</p>
+                        <div class="h-64 relative flex items-center justify-center">
+                            <canvas id="dyn-chart-pie"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Scatter Plot Chart -->
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                            <div>
+                                <h4 class="font-bold text-slate-900">Gráfico de Dispersión (Scatter Plot RFM)</h4>
+                                <p class="text-xs text-slate-500">Visualización de clientes en el espacio dimensional</p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <label class="text-xs text-slate-600 font-medium">Ejes:</label>
+                                <select id="scatter-axis-select" onchange="updateScatterPlot()" class="bg-slate-100 border border-slate-300 text-xs rounded-lg px-2.5 py-1 focus:outline-none">
+                                    <option value="RM">Recencia vs Monto ($)</option>
+                                    <option value="FM">Frecuencia vs Monto ($)</option>
+                                    <option value="RF">Recencia vs Frecuencia</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="h-64 relative">
+                            <canvas id="dyn-chart-scatter"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Data Table Section -->
+                <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900">Tabla de Clientes Segmentados</h3>
+                            <p class="text-xs text-slate-500">Resultados del cálculo RFM, Scores Cuantílicos y Clusters asignados</p>
+                        </div>
+
+                        <!-- Table Actions (Search, Filter, Export) -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="relative">
+                                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                                <input type="text" id="table-search" oninput="filterTable()" placeholder="Buscar cliente..." class="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg w-40 sm:w-52 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+
+                            <select id="table-segment-filter" onchange="filterTable()" class="py-1.5 px-3 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="ALL">Todos los Segmentos</option>
+                                <option value="Big Spenders / VIP">Big Spenders / VIP</option>
+                                <option value="Nuevos Prometedores">Nuevos Prometedores</option>
+                                <option value="Frecuentes Regulares">Frecuentes Regulares</option>
+                                <option value="En Riesgo / Inactivos">En Riesgo / Inactivos</option>
+                            </select>
+
+                            <!-- Export Buttons -->
+                            <button onclick="exportToExcel()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition flex items-center space-x-1.5">
+                                <i class="fa-solid fa-file-excel"></i>
+                                <span>Exportar Excel</span>
+                            </button>
+                            <button onclick="exportToCSV()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition flex items-center space-x-1.5">
+                                <i class="fa-solid fa-file-csv"></i>
+                                <span>Exportar CSV</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scrollable Table Wrapper -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-700">
+                            <thead class="bg-slate-100 text-slate-800 font-semibold uppercase tracking-wider text-[11px]">
+                                <tr>
+                                    <th class="py-3 px-4 rounded-l-lg cursor-pointer hover:bg-slate-200" onclick="sortTable('id')">
+                                        ID Cliente <i class="fa-solid fa-sort ml-1 text-slate-400"></i>
+                                    </th>
+                                    <th class="py-3 px-4 cursor-pointer hover:bg-slate-200" onclick="sortTable('recency')">
+                                        Recencia (Días) <i class="fa-solid fa-sort ml-1 text-slate-400"></i>
+                                    </th>
+                                    <th class="py-3 px-4 cursor-pointer hover:bg-slate-200" onclick="sortTable('frequency')">
+                                        Frecuencia <i class="fa-solid fa-sort ml-1 text-slate-400"></i>
+                                    </th>
+                                    <th class="py-3 px-4 cursor-pointer hover:bg-slate-200" onclick="sortTable('monetary')">
+                                        Monto Total ($) <i class="fa-solid fa-sort ml-1 text-slate-400"></i>
+                                    </th>
+                                    <th class="py-3 px-4 text-center">Score RFM</th>
+                                    <th class="py-3 px-4 rounded-r-lg">Segmento Asignado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body" class="divide-y divide-slate-100">
+                                <!-- Dynamic Rows Go Here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Table Pagination -->
+                    <div class="flex items-center justify-between pt-2">
+                        <p class="text-xs text-slate-500">
+                            Mostrando <span id="pag-start" class="font-semibold text-slate-700">0</span> - <span id="pag-end" class="font-semibold text-slate-700">0</span> de <span id="pag-total" class="font-semibold text-slate-700">0</span> registros
+                        </p>
+                        <div class="flex space-x-1">
+                            <button onclick="changePage(-1)" id="btn-prev-page" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-medium text-slate-600 disabled:opacity-50">Anterior</button>
+                            <button onclick="changePage(1)" id="btn-next-page" class="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded text-xs font-medium text-slate-600 disabled:opacity-50">Siguiente</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 text-slate-400 border-t border-slate-800 mt-auto py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs space-y-1">
+            <p class="font-medium text-slate-300">RFM Customer Segmentation & K-Means Analytics Dashboard</p>
+            <p>Herramienta interactiva de inteligencia de clientes y analítica predictiva.</p>
+        </div>
+    </footer>
+
+    <!-- =================================================================== -->
+    <!-- JAVASCRIPT ENGINE & LOGIC -->
+    <!-- =================================================================== -->
+    <script>
+        // Global State Variables
+        let activeTab = 'tab-notebook';
+        let rawParsedRows = [];
+        let rfmCustomerData = [];
+        let filteredTableData = [];
+        let currentPage = 1;
+        const pageSize = 10;
+        let sortColumn = 'monetary';
+        let sortAsc = false;
+
+        // Chart instances container
+        let charts = {};
+
+        // Toast Notification System
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgClass = type === 'error' ? 'bg-red-600' : type === 'success' ? 'bg-emerald-600' : 'bg-slate-800';
+            const icon = type === 'error' ? 'fa-circle-xmark' : type === 'success' ? 'fa-circle-check' : 'fa-circle-info';
+
+            toast.className = `${bgClass} text-white px-4 py-3 rounded-xl shadow-lg text-xs flex items-center space-x-2 transition-all transform duration-300 ease-out translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // Tab Switching Handler
+        function switchTab(tabId) {
+            activeTab = tabId;
+            document.getElementById('tab-notebook').classList.add('hidden');
+            document.getElementById('tab-analyzer').classList.add('hidden');
+
+            document.getElementById('btn-tab-notebook').classList.remove('bg-slate-800', 'text-white');
+            document.getElementById('btn-tab-analyzer').classList.remove('bg-slate-800', 'text-white');
+
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById('btn-' + tabId).classList.add('bg-slate-800', 'text-white');
+
+            if (tabId === 'tab-notebook') {
+                renderNotebookStaticCharts();
+            }
+        }
+
+        // Render Executive Summary Notebook Charts
+        function renderNotebookStaticCharts() {
+            // 1. Elbow Method Chart
+            if (charts.elbow) charts.elbow.destroy();
+            const ctxElbow = document.getElementById('chart-elbow').getContext('2d');
+            charts.elbow = new Chart(ctxElbow, {
+                type: 'line',
+                data: {
+                    labels: ['K=1', 'K=2', 'K=3', 'K=4', 'K=5', 'K=6', 'K=7'],
+                    datasets: [{
+                        label: 'Inercia Intra-cluster (WCSS)',
+                        data: [15200, 8900, 5200, 2400, 1900, 1600, 1350],
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: ['#94a3b8', '#94a3b8', '#94a3b8', '#10b981', '#94a3b8', '#94a3b8', '#94a3b8'],
+                        pointRadius: [5, 5, 5, 9, 5, 5, 5],
+                        pointHoverRadius: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                afterBody: function(items) {
+                                    if (items[0].dataIndex === 3) return '★ Punto de Inflexión Óptimo (K=4)';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { title: { display: true, text: 'Inercia WCSS' } },
+                        x: { title: { display: true, text: 'Número de Clusters (K)' } }
+                    }
+                }
+            });
+
+            // 2. Segment Donut Chart
+            if (charts.segments) charts.segments.destroy();
+            const ctxSegments = document.getElementById('chart-segments').getContext('2d');
+            charts.segments = new Chart(ctxSegments, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Big Spenders / VIP', 'Nuevos Prometedores', 'Frecuentes Regulares', 'En Riesgo / Inactivos'],
+                    datasets: [{
+                        data: [546, 1224, 1495, 1107],
+                        backgroundColor: ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 } } }
+                    },
+                    cutout: '65%'
+                }
+            });
+
+            // 3. RFM Metrics Comparison Bar Chart
+            if (charts.rfmComparison) charts.rfmComparison.destroy();
+            const ctxRFM = document.getElementById('chart-rfm-comparison').getContext('2d');
+            charts.rfmComparison = new Chart(ctxRFM, {
+                type: 'bar',
+                data: {
+                    labels: ['Big Spenders / VIP', 'Nuevos Prometedores', 'Frecuentes Regulares', 'En Riesgo / Inactivos'],
+                    datasets: [
+                        {
+                            label: 'Recencia Prom. (Días)',
+                            data: [18, 25, 42, 215],
+                            backgroundColor: '#f59e0b'
+                        },
+                        {
+                            label: 'Frecuencia Prom. (Órdenes)',
+                            data: [28, 3, 14, 2],
+                            backgroundColor: '#10b981'
+                        },
+                        {
+                            label: 'Monto Prom. ($ / 100)',
+                            data: [95, 12, 24, 8],
+                            backgroundColor: '#8b5cf6'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // Generates realistic e-commerce sample transaction dataset
+        function loadSampleDataset() {
+            showNotification('Generando dataset de ejemplo para pruebas inmediatas...', 'info');
+            
+            const numCustomers = 120;
+            const sampleRows = [];
+            const today = new Date();
+
+            const segmentProfiles = [
+                { type: 'VIP', count: 18, recencyRange: [2, 20], freqRange: [15, 35], monetaryRange: [1200, 4500] },
+                { type: 'Recent', count: 32, recencyRange: [3, 25], freqRange: [1, 4], monetaryRange: [150, 600] },
+                { type: 'Frequent', count: 42, recencyRange: [10, 45], freqRange: [8, 20], monetaryRange: [300, 1100] },
+                { type: 'AtRisk', count: 28, recencyRange: [110, 320], freqRange: [1, 5], monetaryRange: [80, 500] }
+            ];
+
+            let custCounter = 10001;
+
+            segmentProfiles.forEach(profile => {
+                for (let i = 0; i < profile.count; i++) {
+                    const customerId = 'CUST-' + custCounter++;
+                    const recencyDays = Math.floor(Math.random() * (profile.recencyRange[1] - profile.recencyRange[0])) + profile.recencyRange[0];
+                    const numOrders = Math.floor(Math.random() * (profile.freqRange[1] - profile.freqRange[0])) + profile.freqRange[0];
+                    const totalSpend = Math.floor(Math.random() * (profile.monetaryRange[1] - profile.monetaryRange[0])) + profile.monetaryRange[0];
+
+                    const baseDate = new Date(today);
+                    baseDate.setDate(today.getDate() - recencyDays);
+
+                    for (let order = 0; order < numOrders; order++) {
+                        const orderDate = new Date(baseDate);
+                        orderDate.setDate(baseDate.getDate() - (order * Math.floor(Math.random() * 15 + 2)));
+                        
+                        sampleRows.push({
+                            "ID_Cliente": customerId,
+                            "Fecha_Transaccion": orderDate.toISOString().split('T')[0],
+                            "Monto_Total": parseFloat((totalSpend / numOrders).toFixed(2))
+                        });
+                    }
+                }
+            });
+
+            rawParsedRows = sampleRows;
+            setupColumnMapper(Object.keys(sampleRows[0]));
+            
+            // Auto select mapped columns
+            document.getElementById('map-customer').value = "ID_Cliente";
+            document.getElementById('map-date').value = "Fecha_Transaccion";
+            document.getElementById('map-amount').value = "Monto_Total";
+
+            document.getElementById('mapping-container').classList.remove('hidden');
+            document.getElementById('file-status-badge').innerText = `Dataset de prueba (${sampleRows.length} filas)`;
+            
+            showNotification('¡Datos de prueba cargados con éxito! Haz clic en Procesar.', 'success');
+        }
+
+        // File Drag and Drop Handlers
+        const dropZone = document.getElementById('drop-zone');
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-active');
+            }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-active');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) handleFile(files[0]);
+        });
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length) handleFile(files[0]);
+        }
+
+        function handleFile(file) {
+            showNotification(`Leyendo archivo: ${file.name}...`, 'info');
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    const jsonRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    
+                    if (!jsonRows || jsonRows.length === 0) {
+                        showNotification('El archivo está vacío o no tiene datos válidos.', 'error');
+                        return;
+                    }
+
+                    rawParsedRows = jsonRows;
+                    const columns = Object.keys(jsonRows[0]);
+                    setupColumnMapper(columns);
+
+                    document.getElementById('mapping-container').classList.remove('hidden');
+                    document.getElementById('file-status-badge').innerText = `${file.name} (${jsonRows.length} filas)`;
+                    showNotification('Archivo leído correctamente. Verifica las columnas.', 'success');
+
+                } catch (err) {
+                    console.error(err);
+                    showNotification('Error al procesar el archivo Excel/CSV.', 'error');
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Setup Column Select Dropdowns
+        function setupColumnMapper(columns) {
+            const selects = ['map-customer', 'map-date', 'map-amount'];
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                el.innerHTML = '';
+                columns.forEach(col => {
+                    const opt = document.createElement('option');
+                    opt.value = col;
+                    opt.innerText = col;
+                    el.appendChild(opt);
+                });
+            });
+
+            // Smart Auto-detection of column names
+            columns.forEach(col => {
+                const lower = col.toLowerCase();
+                if (lower.includes('cust') || lower.includes('client') || lower.includes('id')) {
+                    document.getElementById('map-customer').value = col;
+                }
+                if (lower.includes('date') || lower.includes('fecha') || lower.includes('time')) {
+                    document.getElementById('map-date').value = col;
+                }
+                if (lower.includes('amount') || lower.includes('monto') || lower.includes('total') || lower.includes('price') || lower.includes('ventas')) {
+                    document.getElementById('map-amount').value = col;
+                }
+            });
+        }
+
+        // Process RFM Metrics and Execute K-Means
+        function runRFMAnalysis() {
+            const custCol = document.getElementById('map-customer').value;
+            const dateCol = document.getElementById('map-date').value;
+            const amountCol = document.getElementById('map-amount').value;
+
+            if (!custCol || !dateCol || !amountCol) {
+                showNotification('Por favor selecciona las tres columnas correspondientes.', 'error');
+                return;
+            }
+
+            showNotification('Procesando datos y ejecutando algoritmo K-Means...', 'info');
+
+            // 1. Group by Customer and compute Raw R, F, M
+            const customerMap = {};
+            let maxDatasetDate = new Date('1970-01-01');
+
+            rawParsedRows.forEach(row => {
+                const custId = String(row[custCol]).trim();
+                if (!custId || custId === 'null' || custId === 'undefined') return;
+
+                // Parse Date safely
+                let rawDate = row[dateCol];
+                let dateObj = new Date(rawDate);
+                if (isNaN(dateObj.getTime())) {
+                    dateObj = new Date(); // Fallback if invalid
+                }
+
+                if (dateObj > maxDatasetDate) maxDatasetDate = dateObj;
+
+                // Parse Amount safely
+                let amount = parseFloat(String(row[amountCol]).replace(/[^0-9.-]+/g, ""));
+                if (isNaN(amount) || amount < 0) amount = 0;
+
+                if (!customerMap[custId]) {
+                    customerMap[custId] = {
+                        id: custId,
+                        lastDate: dateObj,
+                        frequency: 0,
+                        monetary: 0
+                    };
+                }
+
+                if (dateObj > customerMap[custId].lastDate) {
+                    customerMap[custId].lastDate = dateObj;
+                }
+
+                customerMap[custId].frequency += 1;
+                customerMap[custId].monetary += amount;
+            });
+
+            // Reference date = Max Date + 1 day
+            const referenceDate = new Date(maxDatasetDate);
+            referenceDate.setDate(referenceDate.getDate() + 1);
+
+            const customersList = [];
+            Object.values(customerMap).forEach(c => {
+                const diffTime = Math.abs(referenceDate - c.lastDate);
+                const recencyDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                customersList.push({
+                    id: c.id,
+                    recency: recencyDays,
+                    frequency: c.frequency,
+                    monetary: parseFloat(c.monetary.toFixed(2))
+                });
+            });
+
+            if (customersList.length < 4) {
+                showNotification('Se requieren al menos 4 clientes únicos para ejecutar K-Means (K=4).', 'error');
+                return;
+            }
+
+            // 2. Compute Quantile RFM Scores (1-4)
+            computeQuantileScores(customersList);
+
+            // 3. Execute K-Means Clustering (K = 4)
+            executeKMeans(customersList, 4);
+
+            rfmCustomerData = customersList;
+            filteredTableData = [...customersList];
+
+            // Update Dynamic UI
+            updateDynamicKPIs();
+            renderDynamicCharts();
+            renderTable();
+
+            document.getElementById('analysis-results-section').classList.remove('hidden');
+            showNotification(`¡Análisis completado para ${customersList.length} clientes!`, 'success');
+        }
+
+        // Calculate Quantile Scores (1 to 4)
+        function computeQuantileScores(list) {
+            const sortedR = [...list].sort((a, b) => a.recency - b.recency);
+            const sortedF = [...list].sort((a, b) => a.frequency - b.frequency);
+            const sortedM = [...list].sort((a, b) => a.monetary - b.monetary);
+
+            const n = list.length;
+            const q = (idx) => Math.floor((idx / n) * 4) + 1; // 1 to 4
+
+            // Map ranks
+            sortedR.forEach((item, index) => {
+                // Lower recency is better score (4 = recent, 1 = old)
+                item.rScore = 5 - q(index);
+            });
+            sortedF.forEach((item, index) => {
+                item.fScore = q(index);
+            });
+            sortedM.forEach((item, index) => {
+                item.mScore = q(index);
+            });
+
+            list.forEach(item => {
+                item.rfmScoreStr = `${item.rScore}${item.fScore}${item.mScore}`;
+            });
+        }
+
+        // JS Implementation of Standard K-Means (K=4) with Z-Score Normalization
+        function executeKMeans(data, k = 4) {
+            // Compute Means and StdDev for Normalization
+            const n = data.length;
+            const meanR = data.reduce((s, d) => s + d.recency, 0) / n;
+            const meanF = data.reduce((s, d) => s + d.frequency, 0) / n;
+            const meanM = data.reduce((s, d) => s + d.monetary, 0) / n;
+
+            const stdR = Math.sqrt(data.reduce((s, d) => s + Math.pow(d.recency - meanR, 2), 0) / n) || 1;
+            const stdF = Math.sqrt(data.reduce((s, d) => s + Math.pow(d.frequency - meanF, 2), 0) / n) || 1;
+            const stdM = Math.sqrt(data.reduce((s, d) => s + Math.pow(d.monetary - meanM, 2), 0) / n) || 1;
+
+            // Normalized features vector
+            const points = data.map(d => ({
+                normR: (d.recency - meanR) / stdR,
+                normF: (d.frequency - meanF) / stdF,
+                normM: (d.monetary - meanM) / stdM,
+                ref: d
+            }));
+
+            // Initialize centroids deterministically using quantiles for stability
+            const centroids = [
+                { normR: -1.0, normF: 1.5, normM: 1.5 },   // High M, High F, Low R (VIP)
+                { normR: -0.8, normF: -0.5, normM: -0.2 }, // Low R, Low F (Recent)
+                { normR: 0.0, normF: 0.8, normM: 0.1 },    // Mid R, High F (Frequent)
+                { normR: 1.5, normF: -0.8, normM: -0.8 }   // High R (At Risk)
+            ];
+
+            let assignments = new Array(n).fill(0);
+            let iterations = 0;
+            const maxIter = 30;
+
+            while (iterations < maxIter) {
+                let changed = false;
+
+                // Step 1: Assign points to closest centroid
+                points.forEach((p, idx) => {
+                    let minDist = Infinity;
+                    let bestCluster = 0;
+
+                    centroids.forEach((c, cIdx) => {
+                        const dist = Math.sqrt(
+                            Math.pow(p.normR - c.normR, 2) +
+                            Math.pow(p.normF - c.normF, 2) +
+                            Math.pow(p.normM - c.normM, 2)
+                        );
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestCluster = cIdx;
+                        }
+                    });
+
+                    if (assignments[idx] !== bestCluster) {
+                        assignments[idx] = bestCluster;
+                        changed = true;
+                    }
+                });
+
+                if (!changed) break;
+
+                // Step 2: Recalculate Centroids
+                for (let cIdx = 0; cIdx < k; cIdx++) {
+                    const clusterPoints = points.filter((_, idx) => assignments[idx] === cIdx);
+                    if (clusterPoints.length > 0) {
+                        centroids[cIdx].normR = clusterPoints.reduce((s, p) => s + p.normR, 0) / clusterPoints.length;
+                        centroids[cIdx].normF = clusterPoints.reduce((s, p) => s + p.normF, 0) / clusterPoints.length;
+                        centroids[cIdx].normM = clusterPoints.reduce((s, p) => s + p.normM, 0) / clusterPoints.length;
+                    }
+                }
+
+                iterations++;
+            }
+
+            // Map cluster IDs to Human-Readable Business Labels
+            // Compute real average metrics for each cluster
+            const clusterStats = centroids.map((_, cIdx) => {
+                const members = points.filter((_, idx) => assignments[idx] === cIdx);
+                const avgR = members.reduce((s, p) => s + p.ref.recency, 0) / (members.length || 1);
+                const avgF = members.reduce((s, p) => s + p.ref.frequency, 0) / (members.length || 1);
+                const avgM = members.reduce((s, p) => s + p.ref.monetary, 0) / (members.length || 1);
+                return { cIdx, members, avgR, avgF, avgM };
+            });
+
+            // Sort clusters by Monetary value descending to rank them
+            clusterStats.sort((a, b) => b.avgM - a.avgM);
+
+            const segmentLabelMap = {};
+            // Highest monetary -> VIP
+            segmentLabelMap[clusterStats[0].cIdx] = "Big Spenders / VIP";
+
+            // Remaining clusters
+            const remaining = clusterStats.slice(1);
+            // Sort remaining by Recency ascending (lowest recency = most recent)
+            remaining.sort((a, b) => a.avgR - b.avgR);
+
+            segmentLabelMap[remaining[0].cIdx] = "Nuevos Prometedores";
+            segmentLabelMap[remaining[1].cIdx] = "Frecuentes Regulares";
+            segmentLabelMap[remaining[2].cIdx] = "En Riesgo / Inactivos";
+
+            // Assign back to original dataset
+            points.forEach((p, idx) => {
+                const clusterIdx = assignments[idx];
+                p.ref.segment = segmentLabelMap[clusterIdx];
+            });
+        }
+
+        // Update Dynamic Header KPIs
+        function updateDynamicKPIs() {
+            const totalCust = rfmCustomerData.length;
+            const totalMon = rfmCustomerData.reduce((s, d) => s + d.monetary, 0);
+            const avgRec = rfmCustomerData.reduce((s, d) => s + d.recency, 0) / totalCust;
+            const avgFreq = rfmCustomerData.reduce((s, d) => s + d.frequency, 0) / totalCust;
+
+            document.getElementById('dyn-kpi-customers').innerText = totalCust.toLocaleString();
+            document.getElementById('dyn-kpi-monetary').innerText = '$' + Math.round(totalMon).toLocaleString();
+            document.getElementById('dyn-kpi-recency').innerText = Math.round(avgRec) + ' días';
+            document.getElementById('dyn-kpi-frequency').innerText = avgFreq.toFixed(1) + ' órd.';
+        }
+
+        // Render Charts for Uploaded Dataset
+        function renderDynamicCharts() {
+            // 1. Dynamic Pie Chart
+            const counts = {
+                "Big Spenders / VIP": 0,
+                "Nuevos Prometedores": 0,
+                "Frecuentes Regulares": 0,
+                "En Riesgo / Inactivos": 0
+            };
+
+            rfmCustomerData.forEach(d => {
+                if (counts[d.segment] !== undefined) counts[d.segment]++;
+            });
+
+            if (charts.dynPie) charts.dynPie.destroy();
+            const ctxPie = document.getElementById('dyn-chart-pie').getContext('2d');
+            charts.dynPie = new Chart(ctxPie, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(counts),
+                    datasets: [{
+                        data: Object.values(counts),
+                        backgroundColor: ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // 2. Dynamic Scatter Plot
+            updateScatterPlot();
+        }
+
+        function updateScatterPlot() {
+            const mode = document.getElementById('scatter-axis-select').value;
+            
+            const segmentColors = {
+                "Big Spenders / VIP": '#8b5cf6',
+                "Nuevos Prometedores": '#06b6d4',
+                "Frecuentes Regulares": '#10b981',
+                "En Riesgo / Inactivos": '#f59e0b'
+            };
+
+            const datasets = Object.keys(segmentColors).map(seg => {
+                const segData = rfmCustomerData.filter(d => d.segment === seg);
+                return {
+                    label: seg,
+                    data: segData.map(d => {
+                        let xVal = d.recency;
+                        let yVal = d.monetary;
+
+                        if (mode === 'FM') {
+                            xVal = d.frequency;
+                            yVal = d.monetary;
+                        } else if (mode === 'RF') {
+                            xVal = d.recency;
+                            yVal = d.frequency;
+                        }
+
+                        return { x: xVal, y: yVal, customerId: d.id };
+                    }),
+                    backgroundColor: segmentColors[seg],
+                    pointRadius: 5,
+                    pointHoverRadius: 8
+                };
+            });
+
+            let xAxisTitle = 'Recencia (Días)';
+            let yAxisTitle = 'Monto Total ($)';
+
+            if (mode === 'FM') {
+                xAxisTitle = 'Frecuencia (Órdenes)';
+                yAxisTitle = 'Monto Total ($)';
+            } else if (mode === 'RF') {
+                xAxisTitle = 'Recencia (Días)';
+                yAxisTitle = 'Frecuencia (Órdenes)';
+            }
+
+            if (charts.scatter) charts.scatter.destroy();
+            const ctxScatter = document.getElementById('dyn-chart-scatter').getContext('2d');
+            charts.scatter = new Chart(ctxScatter, {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { size: 11 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const pt = ctx.raw;
+                                    return `${pt.customerId}: (${xAxisTitle}: ${pt.x}, ${yAxisTitle}: ${pt.y})`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: xAxisTitle } },
+                        y: { title: { display: true, text: yAxisTitle }, beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // Filter Table by Search Query and Segment
+        function filterTable() {
+            const query = document.getElementById('table-search').value.toLowerCase();
+            const segmentFilter = document.getElementById('table-segment-filter').value;
+
+            filteredTableData = rfmCustomerData.filter(d => {
+                const matchesSearch = d.id.toLowerCase().includes(query) || d.rfmScoreStr.includes(query);
+                const matchesSeg = (segmentFilter === 'ALL') || (d.segment === segmentFilter);
+                return matchesSearch && matchesSeg;
+            });
+
+            currentPage = 1;
+            renderTable();
+        }
+
+        // Sort Table
+        function sortTable(col) {
+            if (sortColumn === col) {
+                sortAsc = !sortAsc;
+            } else {
+                sortColumn = col;
+                sortAsc = true;
+            }
+
+            filteredTableData.sort((a, b) => {
+                let valA = a[col];
+                let valB = b[col];
+                if (typeof valA === 'string') valA = valA.toLowerCase();
+                if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                if (valA < valB) return sortAsc ? -1 : 1;
+                if (valA > valB) return sortAsc ? 1 : -1;
+                return 0;
+            });
+
+            renderTable();
+        }
+
+        // Render Data Table Rows and Pagination Controls
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            const startIdx = (currentPage - 1) * pageSize;
+            const endIdx = Math.min(startIdx + pageSize, filteredTableData.length);
+            const pageData = filteredTableData.slice(startIdx, endIdx);
+
+            const segBadgeMap = {
+                "Big Spenders / VIP": "bg-purple-100 text-purple-800 border-purple-200",
+                "Nuevos Prometedores": "bg-cyan-100 text-cyan-800 border-cyan-200",
+                "Frecuentes Regulares": "bg-emerald-100 text-emerald-800 border-emerald-200",
+                "En Riesgo / Inactivos": "bg-amber-100 text-amber-800 border-amber-200"
+            };
+
+            if (pageData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">No se encontraron clientes coincidentes</td></tr>`;
+            } else {
+                pageData.forEach(d => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 transition-colors";
+                    const badgeClass = segBadgeMap[d.segment] || "bg-slate-100 text-slate-800";
+
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-semibold text-slate-900">${d.id}</td>
+                        <td class="py-3 px-4">${d.recency} días</td>
+                        <td class="py-3 px-4">${d.frequency} compras</td>
+                        <td class="py-3 px-4 font-medium text-slate-900">$${d.monetary.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td class="py-3 px-4 text-center">
+                            <span class="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono text-[11px] rounded border border-slate-200">${d.rfmScoreStr}</span>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold border ${badgeClass}">
+                                ${d.segment}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // Update Pagination UI
+            document.getElementById('pag-start').innerText = filteredTableData.length ? startIdx + 1 : 0;
+            document.getElementById('pag-end').innerText = endIdx;
+            document.getElementById('pag-total').innerText = filteredTableData.length;
+
+            document.getElementById('btn-prev-page').disabled = currentPage === 1;
+            document.getElementById('btn-next-page').disabled = endIdx >= filteredTableData.length;
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            renderTable();
+        }
+
+        // Export Segmented Data to Excel
+        function exportToExcel() {
+            if (!filteredTableData || filteredTableData.length === 0) {
+                showNotification('No hay datos para exportar.', 'error');
+                return;
+            }
+
+            const exportRows = filteredTableData.map(d => ({
+                "ID Cliente": d.id,
+                "Recencia (Días)": d.recency,
+                "Frecuencia": d.frequency,
+                "Monto Total ($)": d.monetary,
+                "Score R": d.rScore,
+                "Score F": d.fScore,
+                "Score M": d.mScore,
+                "Score RFM": d.rfmScoreStr,
+                "Segmento Asignado": d.segment
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Segmentacion_RFM");
+            XLSX.writeFile(workbook, "Segmentacion_Clientes_RFM.xlsx");
+            showNotification('Archivo Excel exportado con éxito.', 'success');
+        }
+
+        // Export Segmented Data to CSV
+        function exportToCSV() {
+            if (!filteredTableData || filteredTableData.length === 0) {
+                showNotification('No hay datos para exportar.', 'error');
+                return;
+            }
+
+            const exportRows = filteredTableData.map(d => ({
+                "ID_Cliente": d.id,
+                "Recencia_Dias": d.recency,
+                "Frecuencia": d.frequency,
+                "Monto_Total": d.monetary,
+                "Score_RFM": d.rfmScoreStr,
+                "Segmento": d.segment
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(exportRows);
+            const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+
+            const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "Segmentacion_Clientes_RFM.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showNotification('Archivo CSV exportado con éxito.', 'success');
+        }
+
+        // On Initialization
+        window.onload = function() {
+            renderNotebookStaticCharts();
+        };
+    </script>
+</body>
+</html>
